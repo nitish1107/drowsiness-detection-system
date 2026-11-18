@@ -20,7 +20,7 @@ Detect prolonged eye closure through a webcam using computer vision, trigger an 
 
 ### 🌐 Live Production Demo
 
-- 🚀 **Live Vercel Web Application:** [https://profitable-app-profile-analysis.vercel.app](https://profitable-app-profile-analysis.vercel.app)
+- 🚀 **Live Vercel Web Application:** [https://drowsiness-detection-system-chi.vercel.app/](https://drowsiness-detection-system-chi.vercel.app/)
 
 ---
 
