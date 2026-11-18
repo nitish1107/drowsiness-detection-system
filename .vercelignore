@@ -1,0 +1,6 @@
+# Ignore Python files from Vercel serverless detection
+*.py
+requirements.txt
+venv/
+.venv/
+__pycache__/

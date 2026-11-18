@@ -73,12 +73,15 @@ To reduce false alerts from normal blinking, the project requires **20 consecuti
 
 ```text
 drowsiness-detection-system/
+├── index.html          # Vercel client-side web application
 ├── local_desktop.py    # Native desktop OpenCV window (fastest, no browser)
 ├── local_web.py        # Localhost web server & dashboard (http://localhost:8000)
-├── app.py              # Streamlit web application
+├── streamlit_app.py    # Streamlit web application
 ├── alert.mp3           # Optional audio alert
 ├── requirements.txt    # Python dependencies
 ├── README.md
+├── vercel.json
+├── .vercelignore
 └── .gitignore
 ```
 
@@ -130,7 +133,7 @@ python local_web.py
 
 #### Option C: Streamlit App (`http://localhost:8501`)
 ```bash
-streamlit run app.py
+streamlit run streamlit_app.py
 ```
 
 ## 🌐 Deploy to Vercel (Free & Instant)
