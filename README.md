@@ -131,11 +131,6 @@ python local_web.py
 ```
 *Opens a clean, dark-mode web dashboard running entirely on your local machine.*
 
-#### Option C: Streamlit App (`http://localhost:8501`)
-```bash
-streamlit run streamlit_app.py
-```
-
 ## 🌐 Deploy to Vercel (Free & Instant)
 
 This project includes client-side MediaPipe AI (`index.html`) ready for zero-config deployment on **Vercel**:
