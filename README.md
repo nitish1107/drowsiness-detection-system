@@ -18,6 +18,12 @@ Detect prolonged eye closure through a webcam using computer vision, trigger an 
 
 ---
 
+### 🌐 Live Production Demo
+
+- 🚀 **Live Vercel Web Application:** [https://profitable-app-profile-analysis.vercel.app](https://profitable-app-profile-analysis.vercel.app)
+
+---
+
 ## 🌿 About
 
 **Drowsiness Detection System** is a real-time computer vision application that monitors eye activity through a webcam and detects prolonged eye closure.
