@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Drowsiness Detection System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- MediaPipe dependencies via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #151d30;
+      --border: #222f4c;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 24px 16px; min-height: 100vh; }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    header { text-align: center; margin-bottom: 24px; }
+    header h1 { font-size: 32px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+    header p { color: var(--text-muted); font-size: 15px; }
+
+    .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+
+    /* Video area */
+    .video-wrapper { position: relative; width: 100%; border-radius: 10px; overflow: hidden; background: #000; aspect-ratio: 4/3; }
+    video { display: none; }
+    canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .alert-banner {
+      display: none;
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      background: rgba(239, 68, 68, 0.92);
+      color: #fff;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 20px;
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: 1px;
+      animation: flash 0.6s infinite alternate;
+      box-shadow: 0 4px 15px rgba(239, 68, 68, 0.5);
+    }
+    @keyframes flash {
+      from { opacity: 0.8; transform: scale(0.99); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    /* Controls & Metrics */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: 700;
+      margin-top: 14px;
+    }
+    .status-badge.awake { background: rgba(34, 197, 94, 0.15); color: var(--success); border: 1px solid var(--success); }
+    .status-badge.drowsy { background: rgba(239, 68, 68, 0.2); color: var(--danger); border: 1px solid var(--danger); }
+    .status-badge.waiting { background: rgba(148, 163, 184, 0.15); color: var(--text-muted); border: 1px solid var(--border); }
+
+    .control-group { margin-bottom: 20px; }
+    .control-group label { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+    .control-group input[type="range"] { width: 100%; accent-color: var(--accent); height: 6px; border-radius: 3px; cursor: pointer; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+    .btn-start { background: var(--accent); color: #0b0f19; margin-bottom: 12px; }
+    .btn-start:hover { background: #7dd3fc; }
+    .btn-stop { background: #475569; color: #fff; margin-bottom: 12px; }
+    .btn-stop:hover { background: #64748b; }
+
+    .metric-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .metric-card { background: #0b0f19; border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+    .metric-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .metric-val { font-size: 28px; font-weight: 800; color: var(--text); margin-top: 4px; }
+
+    /* Session table */
+    .table-container { max-height: 220px; overflow-y: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: #0b0f19; color: var(--text-muted); font-weight: 600; position: sticky; top: 0; }
+    td.drowsy-log { color: var(--danger); font-weight: bold; }
+    td.awake-log { color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>👁️ Drowsiness Detection System</h1>
+      <p>Real-time client-side AI eye tracking & driver safety monitor</p>
+    </header>
+
+    <div class="grid">
+      <!-- Camera View Area -->
+      <div class="card">
+        <div class="video-wrapper">
+          <video id="webcam" playsinline></video>
+          <canvas id="output_canvas"></canvas>
+          <div id="alertBanner" class="alert-banner">🚨 DROWSINESS DETECTED!</div>
+        </div>
+        <div style="text-align: center;">
+          <div id="statusBadge" class="status-badge waiting">Status: Camera Off</div>
+        </div>
+      </div>
+
+      <!-- Controls & Session Info -->
+      <div class="card">
+        <button id="toggleBtn" class="btn btn-start">▶ Start Camera Detection</button>
+
+        <div class="metric-row">
+          <div class="metric-card">
+            <div class="metric-label">Current EAR</div>
+            <div id="earDisplay" class="metric-val">0.00</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Threshold</div>
+            <div id="threshDisplay" class="metric-val">0.25</div>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label>
+            <span>EAR Sensitivity Threshold</span>
+            <span id="sliderVal">0.25</span>
+          </label>
+          <input type="range" id="earSlider" min="0.15" max="0.35" step="0.01" value="0.25">
+        </div>
+
+        <div class="control-group">
+          <label>
+            <span>Consecutive Frames</span>
+            <span id="framesVal">20 frames (~1.5s)</span>
+          </label>
+          <input type="range" id="framesSlider" min="10" max="40" step="1" value="20">
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h3 style="font-size: 14px; color: var(--text-muted); text-transform: uppercase;">Session Log</h3>
+          <button id="clearLogBtn" style="background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px;">Clear</button>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr><th>Timestamp</th><th>Event</th></tr>
+            </thead>
+            <tbody id="logBody">
+              <tr><td colspan="2" style="color: var(--text-muted); text-align: center;">No events recorded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio element with alert sound -->
+  <audio id="alertSound" src="alert.mp3" preload="auto" loop></audio>
+
+  <script>
+    // Eye landmark indices (MediaPipe Face Mesh)
+    const LEFT_EYE = [33, 160, 158, 133, 153, 144];
+    const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
+
+    const videoElement = document.getElementById('webcam');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const toggleBtn = document.getElementById('toggleBtn');
+    const statusBadge = document.getElementById('statusBadge');
+    const alertBanner = document.getElementById('alertBanner');
+    const earDisplay = document.getElementById('earDisplay');
+    const threshDisplay = document.getElementById('threshDisplay');
+    const earSlider = document.getElementById('earSlider');
+    const sliderVal = document.getElementById('sliderVal');
+    const framesSlider = document.getElementById('framesSlider');
+    const framesVal = document.getElementById('framesVal');
+    const logBody = document.getElementById('logBody');
+    const clearLogBtn = document.getElementById('clearLogBtn');
+    const alertAudio = document.getElementById('alertSound');
+
+    let camera = null;
+    let faceMesh = null;
+    let isRunning = false;
+    let frameCounter = 0;
+    let drowsyStartTime = null;
+    let isAlertPlaying = false;
+    let consecutiveLimit = 20;
+    let earThreshold = 0.25;
+    let logs = [];
+    let audioCtx = null;
+    let oscillator = null;
+
+    // Threshold slider listener
+    earSlider.addEventListener('input', (e) => {
+      earThreshold = parseFloat(e.target.value);
+      sliderVal.innerText = earThreshold.toFixed(2);
+      threshDisplay.innerText = earThreshold.toFixed(2);
+    });
+
+    framesSlider.addEventListener('input', (e) => {
+      consecutiveLimit = parseInt(e.target.value);
+      framesVal.innerText = `${consecutiveLimit} frames (~${(consecutiveLimit/15).toFixed(1)}s)`;
+    });
+
+    clearLogBtn.addEventListener('click', () => {
+      logs = [];
+      renderLogs();
+    });
+
+    // Euclidean distance
+    function dist(p1, p2) {
+      return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+    }
+
+    function calculateEAR(landmarks, indices) {
+      const p0 = landmarks[indices[0]];
+      const p1 = landmarks[indices[1]];
+      const p2 = landmarks[indices[2]];
+      const p3 = landmarks[indices[3]];
+      const p4 = landmarks[indices[4]];
+      const p5 = landmarks[indices[5]];
+
+      const A = dist(p1, p5);
+      const B = dist(p2, p4);
+      const C = dist(p0, p3);
+      return (A + B) / (2.0 * C);
+    }
+
+    // Web Audio synthesizer fallback for alarm sound
+    function startAlarmSound() {
+      // First try MP3 playback
+      alertAudio.play().catch(() => {
+        // Fallback to Web Audio API beep
+        try {
+          if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          if (!oscillator) {
+            oscillator = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            oscillator.connect(gain);
+            gain.connect(audioCtx.destination);
+            oscillator.start();
+          }
+        } catch(e) {}
+      });
+    }
+
+    function stopAlarmSound() {
+      alertAudio.pause();
+      alertAudio.currentTime = 0;
+      if (oscillator) {
+        try {
+          oscillator.stop();
+          oscillator.disconnect();
+        } catch(e) {}
+        oscillator = null;
+      }
+    }
+
+    function addLog(status, isDrowsy) {
+      const timeStr = new Date().toLocaleTimeString();
+      logs.unshift({ time: timeStr, status: status, isDrowsy: isDrowsy });
+      renderLogs();
+    }
+
+    function renderLogs() {
+      if (logs.length === 0) {
+        logBody.innerHTML = '<tr><td colspan="2" style="color: var(--text-muted); text-align: center;">No events recorded yet.</td></tr>';
+        return;
+      }
+      logBody.innerHTML = logs.slice(0, 15).map(l => `
+        <tr>
+          <td>${l.time}</td>
+          <td class="${l.isDrowsy ? 'drowsy-log' : 'awake-log'}">${l.status}</td>
+        </tr>
+      `).join('');
+    }
+
+    // Process each video frame from Face Mesh
+    function onResults(results) {
+      canvasElement.width = videoElement.videoWidth || 640;
+      canvasElement.height = videoElement.videoHeight || 480;
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+      let earVal = 0.0;
+      let faceFound = false;
+
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        faceFound = true;
+        const landmarks = results.multiFaceLandmarks[0];
+
+        const leftEAR = calculateEAR(landmarks, LEFT_EYE);
+        const rightEAR = calculateEAR(landmarks, RIGHT_EYE);
+        earVal = (leftEAR + rightEAR) / 2.0;
+
+        // Draw green landmark dots around eyes
+        canvasCtx.fillStyle = '#22c55e';
+        [...LEFT_EYE, ...RIGHT_EYE].forEach(idx => {
+          const pt = landmarks[idx];
+          canvasCtx.beginPath();
+          canvasCtx.arc(pt.x * canvasElement.width, pt.y * canvasElement.height, 2.5, 0, 2 * Math.PI);
+          canvasCtx.fill();
+        });
+
+        // Drowsiness evaluation
+        if (earVal < earThreshold) {
+          frameCounter++;
+          if (frameCounter >= consecutiveLimit) {
+            alertBanner.style.display = 'block';
+            statusBadge.className = 'status-badge drowsy';
+            statusBadge.innerText = '⚠️ Status: DROWSY!';
+
+            if (!isAlertPlaying) {
+              drowsyStartTime = Date.now();
+              isAlertPlaying = true;
+              startAlarmSound();
+              addLog('Drowsiness Detected', true);
+            }
+          }
+        } else {
+          frameCounter = 0;
+          alertBanner.style.display = 'none';
+          statusBadge.className = 'status-badge awake';
+          statusBadge.innerText = 'Status: Awake & Attentive';
+
+          if (isAlertPlaying) {
+            const dur = ((Date.now() - drowsyStartTime) / 1000).toFixed(1);
+            stopAlarmSound();
+            isAlertPlaying = false;
+            drowsyStartTime = null;
+            addLog(`Awake (after ${dur}s)`, false);
+          }
+        }
+      } else {
+        statusBadge.className = 'status-badge waiting';
+        statusBadge.innerText = 'Status: Looking for face...';
+        alertBanner.style.display = 'none';
+        if (isAlertPlaying) {
+          stopAlarmSound();
+          isAlertPlaying = false;
+        }
+      }
+
+      earDisplay.innerText = earVal.toFixed(2);
+      canvasCtx.restore();
+    }
+
+    // Toggle camera start/stop
+    toggleBtn.addEventListener('click', async () => {
+      if (!isRunning) {
+        toggleBtn.innerText = '⏳ Initializing AI model...';
+        toggleBtn.disabled = true;
+
+        if (!faceMesh) {
+          faceMesh = new FaceMesh({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+          });
+          faceMesh.setOptions({
+            maxNumFaces: 1,
+            refineLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+          });
+          faceMesh.onResults(onResults);
+        }
+
+        camera = new Camera(videoElement, {
+          onFrame: async () => {
+            if (isRunning) await faceMesh.send({ image: videoElement });
+          },
+          width: 640,
+          height: 480
+        });
+
+        await camera.start();
+        isRunning = true;
+        toggleBtn.disabled = false;
+        toggleBtn.innerText = '⏹ Stop Camera Detection';
+        toggleBtn.className = 'btn btn-stop';
+        statusBadge.className = 'status-badge awake';
+        statusBadge.innerText = 'Status: Active';
+      } else {
+        isRunning = false;
+        if (camera) await camera.stop();
+        stopAlarmSound();
+        isAlertPlaying = false;
+        alertBanner.style.display = 'none';
+        toggleBtn.innerText = '▶ Start Camera Detection';
+        toggleBtn.className = 'btn btn-start';
+        statusBadge.className = 'status-badge waiting';
+        statusBadge.innerText = 'Status: Camera Stopped';
+        earDisplay.innerText = '0.00';
+      }
+    });
+  </script>
+</body>
+</html>

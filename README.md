@@ -133,6 +133,16 @@ python local_web.py
 streamlit run app.py
 ```
 
+## 🌐 Deploy to Vercel (Free & Instant)
+
+This project includes client-side MediaPipe AI (`index.html`) ready for zero-config deployment on **Vercel**:
+
+1. Go to [vercel.com](https://vercel.com) and log in with your GitHub account.
+2. Click **Add New...** > **Project**.
+3. Import your GitHub repository: **`nitish1107/drowsiness-detection-system`**.
+4. Leave all build settings default and click **Deploy**.
+5. Your live app will be live at `https://drowsiness-detection-system-xxx.vercel.app`! Anyone can open the link in any mobile or desktop browser to run real-time drowsiness detection.
+
 ## 🎚️ Configuration
 
 The sidebar provides two main controls:
